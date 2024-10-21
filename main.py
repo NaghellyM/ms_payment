@@ -20,7 +20,8 @@ epayco = Epayco({
 
 if __name__ == '__main__':
     app.run(debug=True)
-
+    
+#metodo para el token de la targeta
 def create_token(data):
     try:
         card_info = {
@@ -34,6 +35,8 @@ def create_token(data):
         return token
     except Exception as e:
         return {'error': str(e)}
+    
+    #metodo para crear un cliente
 def create_customer(token,data):
     customer_info={
         'name': data['name'],
@@ -53,7 +56,7 @@ def process_payment(data, customer_id, token_card):
         payment_info = {
             'token_card': token_card,
             'customer_id': customer_id,
-            "doc_type": "CC",  # Incluye 'doc_type' aquí
+            "doc_type": "CC", 
             'doc_number': data['doc_number'],
             'name': data['name'],
             'last_name': data['last_name'],
