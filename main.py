@@ -18,9 +18,8 @@ epayco = Epayco({
 
 })
 
-if __name__ == '__main__':
-    app.run(debug=True)
-    
+
+
 #metodo para el token de la targeta
 def create_token(data):
     try:
@@ -35,7 +34,7 @@ def create_token(data):
         return token
     except Exception as e:
         return {'error': str(e)}
-    
+
     #metodo para crear un cliente
 def create_customer(token,data):
     customer_info={
@@ -56,7 +55,7 @@ def process_payment(data, customer_id, token_card):
         payment_info = {
             'token_card': token_card,
             'customer_id': customer_id,
-            "doc_type": "CC", 
+            "doc_type": "CC",
             'doc_number': data['doc_number'],
             'name': data['name'],
             'last_name': data['last_name'],
@@ -79,3 +78,41 @@ def process_payment(data, customer_id, token_card):
         return response
     except Exception as e:
         return {'error': str(e)}
+
+
+#enpoint para manejar todo el flujo de pago
+@app.route('/proces_payment', methods=['POST'])
+def handle_process_payment():
+    data = request.json
+
+#crea el token de la tarjeta
+    token_response = create_token(data)
+    print("Token response", json.dumps(token_response))
+
+#verificar si hubo error al crear el token
+    if token_response["status"] is False:
+        return jsonify(token_response), 500
+
+    token_card = token_response['id'] #extrae el id del token
+
+    #Crear cliente
+    customer_response = create_customer(token_card, data)
+    print("Customer response", json.dumps(customer_response))
+
+    #Verificar si hubo error al crear el cliente
+    if 'error' in customer_response:
+        return jsonify(customer_response), 500
+
+    customer_id = customer_response['data']['customerId']
+
+    payment_response = process_payment(data, customer_id, token_card)
+    print("Payment response", json.dumps(payment_response))
+
+    if 'error' in payment_response:
+        return jsonify(payment_response), 500
+    return jsonify(payment_response), 200
+
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
