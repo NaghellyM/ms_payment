@@ -1,0 +1,67 @@
+# Entornos virtuales
+venv/
+ENV/
+env/
+.venv/
+.VENV/
+
+# Archivos de Python
+*.py[cod]
+_pycache_/
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.pyo
+
+# Configuración de entorno
+.env
+*.env
+
+# Archivos de log y caché
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+
+# Pytest
+.cache/
+.pytest_cache/
+
+# Archivos creados por IDEs
+.vscode/
+.idea/
+*.swp
+
+# Dependencias instaladas por pip
+pip-wheel-metadata/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Archivos de distribución
+*.manifest
+*.spec
+
+# Archivos generados por MacOS
+.DS_Storeblinker==1.8.2
+certifi==2024.8.30
+charset-normalizer==3.4.0
+click==8.1.7
+colorama==0.4.6
+epaycosdk==3.2.0
+epaycosdk-win==3.1.0
+Flask==3.0.3
+idna==3.10
+itsdangerous==2.2.0
+Jinja2==3.1.4
+MarkupSafe==3.0.2
+pycryptodome==3.21.0
+python-dotenv==1.0.1
+requests==2.32.3
+urllib3==2.2.3
+Werkzeug==3.0.4
