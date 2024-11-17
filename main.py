@@ -3,6 +3,7 @@ import os
 import json
 from dotenv import load_dotenv
 from epaycosdk.epayco import Epayco
+import requests
 
 
 load_dotenv()#carga las variables de entorno que estan en el archivo .env
@@ -19,8 +20,7 @@ epayco = Epayco({
 })
 
 
-
-#metodo para el token de la targeta
+#metodo para el token de la tarjeta
 def create_token(data):
     try:
         card_info = {
@@ -50,6 +50,21 @@ def create_customer(token,data):
         return customer
     except Exception as e:
         return {'error': str(e)}
+    
+    # Método para obtener la invoice_reference desde el microservicio de negocio
+def get_invoice_reference(invoice_reference):
+    try:
+        # Hacer una solicitud HTTP al microservicio para obtener la referencia de la factura
+        url = f"{os.getenv('MS_BUSINESS_URL')}/createMSP/{id}"
+        response = requests.get(url)
+        
+        if response.status_code == 200:
+            return response.json().get('invoice_reference')
+        else:
+            return None
+    except Exception as e:
+        return None
+
 def process_payment(data, customer_id, token_card):
     try:
         payment_info = {
@@ -69,15 +84,32 @@ def process_payment(data, customer_id, token_card):
             'value': data['value'],
             'tax': '0',
             'tax_base': data['value'],
-            'currency': 'COP'
-
+            'currency': 'COP',
+            'invoice_reference': data['invoice_reference'] 
         }
-        print(f"Payment Info: {json.dumps(payment_info, indent=4)}")  # Imprime los datos de la solicitud
-
+       
         response = epayco.charge.create(payment_info)
-        return response
+        print("Payment Response:", json.dumps(response, indent=4))  # Agregar detalles para debug
+
+        # Validar el estado de la transacción
+        if response.get('status') is True and response.get('data', {}).get('estado') == 'Aceptada':
+            return {
+                'status': 'success',
+                'message': 'Pago realizado con éxito',
+                'transaction_id': response['data']['ref_payco'],
+                'details': response['data']
+            }
+        else:
+            return {
+                'status': 'failed',
+                'message': 'Pago fallido',
+                'error': response.get('data', {}).get('description', 'No se pudo procesar el pago'),
+                'details': response['data']
+            }
+
     except Exception as e:
         return {'error': str(e)}
+
 
 
 #enpoint para manejar todo el flujo de pago
@@ -105,12 +137,18 @@ def handle_process_payment():
 
     customer_id = customer_response['data']['customerId']
 
+    #Procesar el pago
     payment_response = process_payment(data, customer_id, token_card)
-    print("Payment response", json.dumps(payment_response))
+    print("Payment Response:", json.dumps(payment_response, indent=4))
 
-    if 'error' in payment_response:
-        return jsonify(payment_response), 500
-    return jsonify(payment_response), 200
+    if payment_response.get('status') == 'success':
+        return jsonify(payment_response), 200
+    else:
+        return jsonify({
+        'status': 'error',
+        'message': 'Hubo un problema al procesar el pago',
+        'details': payment_response
+    }), 500
 
 
 
