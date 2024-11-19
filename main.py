@@ -5,16 +5,16 @@ from dotenv import load_dotenv
 from epaycosdk.epayco import Epayco
 import requests
 
-load_dotenv()#carga las variables de entorno que estan en el archivo .env
+load_dotenv()  # carga las variables de entorno que estan en el archivo .env
 
-app = Flask(__name__) # Esta instancia se utiliza para configurar y ejecutar la aplicación web
+app = Flask(__name__)  # Esta instancia se utiliza para configurar y ejecutar la aplicación web
 
 # Instancia la clase Epayco con las credenciales de la cuenta
 epayco = Epayco({
     'apiKey': os.getenv('EPAYCO_PUBLIC_KEY'),
     'privateKey': os.getenv('EPAYCO_PRIVATE_KEY'),
-    'lenguage': 'ES', #lenjuage de los mensajes
-    'test': os.getenv('EPAYCO_TEST') == 'true', #"Aqui hay un cambio" "#definir de modo de prueba a produccion
+    'lenguage': 'ES',  # lenjuage de los mensajes
+    'test': os.getenv('EPAYCO_TEST') == 'true',  # "Aqui hay un cambio" "#definir de modo de prueba a produccion
 
 })
 
@@ -29,42 +29,45 @@ def get_invoice_details(data):
             }
 
         # Hacer la petición al MS de negocios
-    
+
         # Obtener la URL base del microservicio desde las variables de entorno
         business_ms_base_url = os.getenv('MS_BUSINESS')
 
         # Construir la URL completa
         business_ms_url = f"{business_ms_base_url}/invoices/{invoice_id}"
-        #response = requests.post(business_ms_url, json={'id': invoice_id})
+        # response = requests.post(business_ms_url, json={'id': invoice_id})
         response = requests.get(business_ms_url)
         print(response)
 
         if response.status_code == 200:  # Verifica si la respuesta HTTP tiene un código de estado 200 (OK)
-            invoice_data = response.json() #respuesta JSON en un diccionario de Python
-            print(f"Respuesta de la factura: {invoice_data}")   # Imprime la respuesta JSON para depuración
-            print(f"total: {invoice_data['invoice']['total']} ") # Imprime el valor del campo 'total' de la factura
-            if 'total' not in invoice_data['invoice']: # Verifica si el campo 'total' está presente en la respuesta
+            invoice_data = response.json()  # respuesta JSON en un diccionario de Python
+            print(f"Respuesta de la factura: {invoice_data}")  # Imprime la respuesta JSON para depuración
+            print(f"total: {invoice_data['invoice']['total']} ")  # Imprime el valor del campo 'total' de la factura
+            if 'total' not in invoice_data['invoice']:  # Verifica si el campo 'total' está presente en la respuesta
                 return {
                     'success': False,
                     'error': 'La respuesta no contiene el campo "total"'
                 }
-            return {  # Si el campo 'total' está presente, retorna un diccionario con los detalles de la factura y el total
+            return {
+                # Si el campo 'total' está presente, retorna un diccionario con los detalles de la factura y el total
                 'success': True,
                 'invoice': invoice_data,
                 'total': invoice_data['invoice']['total']
             }
-        else: # Si el código de estado no es 200 (OK)
-            return {  # Retorna un diccionario con un mensaje de error indicando que no se pudo obtener la información de la factura
+        else:  # Si el código de estado no es 200 (OK)
+            return {
+                # Retorna un diccionario con un mensaje de error indicando que no se pudo obtener la información de la factura
                 'success': False,
                 'error': 'No se pudo obtener la información de la factura'
             }
     except Exception as e:
         return {
-            'success': False, # Captura cualquier excepción que ocurra durante la ejecución del bloque try
-            'error': str(e) # Retorna un diccionario con un mensaje de error y la descripción de la excepción
+            'success': False,  # Captura cualquier excepción que ocurra durante la ejecución del bloque try
+            'error': str(e)  # Retorna un diccionario con un mensaje de error y la descripción de la excepción
         }
 
-#metodo para el token de la targeta
+
+# metodo para el token de la targeta
 def create_token(data):
     try:
         card_info = {
@@ -79,13 +82,15 @@ def create_token(data):
     except Exception as e:
         return {'error': str(e)}
 
-    #metodo para crear un cliente
-def create_customer(token,data):
-    customer_info={
+    # metodo para crear un cliente
+
+
+def create_customer(token, data):
+    customer_info = {
         'name': data['name'],
-        'last_name':data['last_name'],
-        'email':data['email'],
-        'phone' : data['phone'],
+        'last_name': data['last_name'],
+        'email': data['email'],
+        'phone': data['phone'],
         'default': True
     }
     customer_info['token_card'] = token
@@ -95,9 +100,10 @@ def create_customer(token,data):
     except Exception as e:
         return {'error': str(e)}
 
+
 def process_payment(data, customer_id, token_card, invoice_data):
     print(invoice_data, "hola")
-    print("aqui estoy" ,invoice_data['invoice']['total'])
+    print("aqui estoy", invoice_data['invoice']['total'])
     try:
         payment_info = {
             'token_card': token_card,
@@ -111,28 +117,27 @@ def process_payment(data, customer_id, token_card, invoice_data):
             'address': data['address'],
             'phone': data['phone'],
             'cell_phone': data['cell_phone'],
-            #'bill': data['bill'],
+            # 'bill': data['bill'],
             'description': f'Pago de factura {data["invoice_id"]}',
-            #'description': 'Pago de servicios',
-
-            #'value': data['value'],
+            # 'description': 'Pago de servicios',
+            # 'value': data['value'],
             'value': str(invoice_data['invoice']['total']),
             'tax': '0',
             'tax_base': str(invoice_data['invoice']['total']),
-            #'tax_base': data['value'],
+            # 'tax_base': data['value'],
             'currency': 'COP'
 
         }
 
         print(f"Payment Info: {json.dumps(payment_info, indent=4)}")  # Imprime los datos de la solicitud
 
-        #aqui es donde se hace el llmado a la funcion que envia el pago al correo
-        response = epayco.charge.create(payment_info) # Realiza la solicitud de pago
+        # aqui es donde se hace el llmado a la funcion que envia el pago al correo
+        response = epayco.charge.create(payment_info)  # Realiza la solicitud de pago
 
         if response.get('status') is True:
             update_invoice_status(data['invoice_id'], response.get('data', {}))
 
-        #response = epayco.charge.create(payment_info)
+        # response = epayco.charge.create(payment_info)
         return response
     except Exception as e:
         return {'error': str(e)}
@@ -155,7 +160,7 @@ def update_invoice_status(invoice_id, payment_data):
         return False
 
 
-#enpoint para manejar todo el flujo de pago
+# enpoint para manejar todo el flujo de pago
 @app.route('/process_payment', methods=['POST'])
 def handle_process_payment():
     try:
