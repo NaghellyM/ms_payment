@@ -4,10 +4,12 @@ import json
 from dotenv import load_dotenv
 from epaycosdk.epayco import Epayco
 import requests
+from flask_cors import CORS
 
 load_dotenv()  # carga las variables de entorno que estan en el archivo .env
 
 app = Flask(__name__)  # Esta instancia se utiliza para configurar y ejecutar la aplicación web
+CORS(app)  # Esto permite todas las solicitudes de cualquier origen
 
 # Instancia la clase Epayco con las credenciales de la cuenta
 epayco = Epayco({
@@ -19,52 +21,48 @@ epayco = Epayco({
 })
 
 
-def get_invoice_details(data):
+def get_quota_details(data):
     try:
-        invoice_id = data.get('invoice_id')
-        if not invoice_id:
+        quota_id = data.get('quota_id')
+        if not quota_id:
             return {
                 'success': False,
                 'error': 'El ID de la factura es requerido'
             }
 
         # Hacer la petición al MS de negocios
-
-        # Obtener la URL base del microservicio desde las variables de entorno
         business_ms_base_url = os.getenv('MS_BUSINESS')
+        business_ms_url = f"{business_ms_base_url}/quotas/{quota_id}"
 
-        # Construir la URL completa
-        business_ms_url = f"{business_ms_base_url}/invoices/{invoice_id}"
-        # response = requests.post(business_ms_url, json={'id': invoice_id})
         response = requests.get(business_ms_url)
-        print(response)
+        print("Respuesta del microservicio:", response.status_code, response.text)
 
-        if response.status_code == 200:  # Verifica si la respuesta HTTP tiene un código de estado 200 (OK)
-            invoice_data = response.json()  # respuesta JSON en un diccionario de Python
-            print(f"Respuesta de la factura: {invoice_data}")  # Imprime la respuesta JSON para depuración
-            print(f"total: {invoice_data['invoice']['total']} ")  # Imprime el valor del campo 'total' de la factura
-            if 'total' not in invoice_data['invoice']:  # Verifica si el campo 'total' está presente en la respuesta
-                return {
-                    'success': False,
-                    'error': 'La respuesta no contiene el campo "total"'
-                }
+        if response.status_code == 200: 
+            quota_data = response.json()
+            print(f"Datos recibidos de la factura: {quota_data}")
+
+            # if 'quota' not in quota_data:
+            #     return {
+            #         'success': False,
+            #         'error': 'No se encontró la clave "quota" en la respuesta del microservicio'
+            #     }
+
             return {
-                # Si el campo 'total' está presente, retorna un diccionario con los detalles de la factura y el total
                 'success': True,
-                'invoice': invoice_data,
-                'total': invoice_data['invoice']['total']
+                # 'quota': quota_data['quota'],
+                'amount': quota_data['amount']
             }
-        else:  # Si el código de estado no es 200 (OK)
+        else:
             return {
-                # Retorna un diccionario con un mensaje de error indicando que no se pudo obtener la información de la factura
                 'success': False,
                 'error': 'No se pudo obtener la información de la factura'
             }
     except Exception as e:
         return {
-            'success': False,  # Captura cualquier excepción que ocurra durante la ejecución del bloque try
-            'error': str(e)  # Retorna un diccionario con un mensaje de error y la descripción de la excepción
+            'success': False,
+            'error': str(e)
         }
+
 
 
 # metodo para el token de la targeta
@@ -101,9 +99,9 @@ def create_customer(token, data):
         return {'error': str(e)}
 
 
-def process_payment(data, customer_id, token_card, invoice_data):
-    print(invoice_data, "hola")
-    print("aqui estoy", invoice_data['invoice']['total'])
+def process_payment(data, customer_id, token_card, quota_data):
+    print(quota_data, "hola")
+    print("aqui estoy", quota_data['amount'])
     try:
         payment_info = {
             'token_card': token_card,
@@ -118,38 +116,37 @@ def process_payment(data, customer_id, token_card, invoice_data):
             'phone': data['phone'],
             'cell_phone': data['cell_phone'],
             # 'bill': data['bill'],
-            'description': f'Pago de factura {data["invoice_id"]}',
+            'description': f'Pago de factura {data["quota_id"]}',
             # 'description': 'Pago de servicios',
             # 'value': data['value'],
-            'value': str(invoice_data['invoice']['total']),
+            'value': str(quota_data['amount']),
             'tax': '0',
-            'tax_base': str(invoice_data['invoice']['total']),
+            'tax_base': str(quota_data['amount']),
             # 'tax_base': data['value'],
             'currency': 'COP'
 
-        }
-
+}
         print(f"Payment Info: {json.dumps(payment_info, indent=4)}")  # Imprime los datos de la solicitud
 
         # aqui es donde se hace el llmado a la funcion que envia el pago al correo
         response = epayco.charge.create(payment_info)  # Realiza la solicitud de pago
 
         if response.get('status') is True:
-            update_invoice_status(data['invoice_id'], response.get('data', {}))
-
-        # response = epayco.charge.create(payment_info)
+            update_quota_status(data['quota_id'], response.get('data', {}))
+            print("ACTUALIZAR")
+        response = epayco.charge.create(payment_info)
         return response
     except Exception as e:
         return {'error': str(e)}
 
 
-def update_invoice_status(invoice_id, payment_data):
+def update_quota_status(quota_id, payment_data):
     try:
-        update_url = f"http://127.0.0.1:3333/invoices/{invoice_id}"
+        update_url = f"http://127.0.0.1:3333/quotas/{quota_id}"
         update_data = {
-            "payment_status": "PAID",
-            "payment_reference": payment_data.get('ref_payco'),
-            "payment_date": payment_data.get('transaction_date'),
+            # "payment_status": "PAID",
+            # "payment_reference": payment_data.get('ref_payco'),
+            # "payment_date": payment_data.get('transaction_date'),
             "status": True
         }
 
@@ -167,7 +164,7 @@ def handle_process_payment():
         data = request.json
 
         # Validar datos requeridos
-        required_fields = ['invoice_id', 'card_number', 'exp_year', 'exp_month', 'cvc',
+        required_fields = ['quota_id', 'card_number', 'exp_year', 'exp_month', 'cvc',
                            'name', 'last_name', 'email', 'doc_number', 'city', 'address',
                            'phone', 'cell_phone']
 
@@ -176,9 +173,9 @@ def handle_process_payment():
                 return jsonify({"error": f"El campo {field} es requerido"}), 400
 
         # Obtener detalles de la factura
-        invoice_response = get_invoice_details(data)
-        if not invoice_response['success']:
-            return jsonify({"error": invoice_response['error']}), 400
+        quota_response = get_quota_details(data)
+        if not quota_response['success']:
+            return jsonify({"error": quota_response['error']}), 400
 
         # Crear token de tarjeta
         token_response = create_token(data)
@@ -201,7 +198,7 @@ def handle_process_payment():
         customer_id = customer_response['data']['customerId']
 
         # Procesar pago
-        payment_response = process_payment(data, customer_id, token_card, invoice_response['invoice'])
+        payment_response = process_payment(data, customer_id, token_card, quota_response)
         print("Payment response:", json.dumps(payment_response))
 
         if 'error' in payment_response:
